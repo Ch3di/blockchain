@@ -5,6 +5,19 @@ class Block {
     private int index;
     public String timestamp;
     public String data;
+    private String previousHash;
+    private String hash;
+    private int nonce;
+
+    public Block(int index, String timestamp, String data, String previousHash)
+    {
+        this.index = index;
+        this.timestamp = timestamp;
+        this.data = data;
+        this.previousHash = previousHash;
+        this.hash = calculateHash();
+        this.nonce = 0;
+    }
 
     public int getIndex() {
         return index;
@@ -20,8 +33,6 @@ class Block {
                 ",\n hash='" + hash + '\'' +
                 "\n }";
     }
-
-    private String previousHash;
 
     public String getPreviousHash() {
         return previousHash;
@@ -39,18 +50,13 @@ class Block {
         this.hash = hash;
     }
 
-    private String hash;
-    public Block(int index, String timestamp, String data, String previousHash)
-    {
-        this.index = index;
-        this.timestamp = timestamp;
+    public void setData(String data) {
         this.data = data;
-        this.previousHash = previousHash;
-        this.hash = calculateHash();
     }
+
     String calculateHash()
     {
-        String dataHash = index+timestamp+data + previousHash;
+        String dataHash = index+timestamp+data + previousHash+ nonce;
         byte[] hash=null;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -61,16 +67,29 @@ class Block {
         }
         return DatatypeConverter.printHexBinary(hash);
     }
+    void mineBlock(int difficulty)
+    {
+        String zeros = new String(new char[difficulty]).replace("\0","0");
+        while(! hash.substring(0,difficulty).equals(zeros) )
+        {
+            nonce++;
+            hash = calculateHash();
+        }
+        System.out.println("Block was mined:" +hash);
+    }
 }
 
 
 
 class Blockchain {
     Vector<Block> chain;
+    int difficulty;
     public Blockchain()
     {
         chain = new Vector<Block>();
+        difficulty =3;
         initChain();
+
     }
     private void initChain()
     {
@@ -84,6 +103,7 @@ class Blockchain {
     {
         block.setPreviousHash(getLatestBlock().getHash());
         block.setHash(block.calculateHash());
+        block.mineBlock(difficulty);
         chain.add(block);
     }
 
@@ -133,12 +153,14 @@ public  class ChadyCoin
 
         // Try to change the hash of a block
         try {
-            ChadyCoin.searchByIndex(1).setHash("365A3D78B6CE96A08F1BB9E8434B7A0C7626B59540A5220C365C0E2EB4B4B98C");
+            ChadyCoin.searchByIndex(1).setData("{ reciever : 0x0235, sender : 0x2189, amount: 70000000000000$€ }");
         } catch (NullPointerException e)
         {
             System.out.println("Block not found");
         }
         // changing the hash of one block corrupts the chain
         System.out.println(ChadyCoin.isValidChain());
+
+
     }
 }
