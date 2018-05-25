@@ -1,20 +1,42 @@
 import java.security.MessageDigest;
 import java.util.Vector;
 import javax.xml.bind.DatatypeConverter;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
+
+class Transaction {
+    String fromAddress;
+    String toAddress;
+    int amount;
+    public Transaction(String fromAddress, String toAddress, int amount) {
+        this.fromAddress = fromAddress;
+        this.toAddress = toAddress;
+        this.amount = amount;
+    }
+
+    @Override
+    public String toString() {
+        return "Transaction{\n" +
+                "\t fromAddress='" + fromAddress + '\'' +
+                "\n\t toAddress='" + toAddress + '\'' +
+                "\n\t amount=" + amount +
+                "\n}";
+    }
+}
 class Block {
     private int index;
     public String timestamp;
-    public String data;
+    public Vector<Transaction> transactions;
     private String previousHash;
     private String hash;
     private int nonce;
 
-    public Block(int index, String timestamp, String data, String previousHash)
+    public Block(int index, String timestamp, Vector<Transaction> transactions)
     {
         this.index = index;
         this.timestamp = timestamp;
-        this.data = data;
-        this.previousHash = previousHash;
+        this.transactions = transactions;
+        this.previousHash = "";
         this.hash = calculateHash();
         this.nonce = 0;
     }
@@ -23,12 +45,20 @@ class Block {
         return index;
     }
 
+    public String transactionsToString()
+    {
+        String transactionText="";
+        for(int i=0;i<transactions.size();i++)
+            transactionText += transactions.elementAt(i).toString();
+        return transactionText;
+
+    }
     @Override
     public String toString() {
         return "Block { \n" +
                 "index=" + index +
                 ",\n timestamp='" + timestamp + '\'' +
-                ",\n data='" + data + '\'' +
+                ",\n Transactions='" + (transactions!=null ? transactions.toString() : "No Transactions in this block") + '\'' +
                 ",\n previousHash='" + previousHash + '\'' +
                 ",\n hash='" + hash + '\'' +
                 "\n }";
@@ -46,17 +76,23 @@ class Block {
         return hash;
     }
 
-    public void setHash(String hash) {
+    public void setHash(String hash)
+    {
         this.hash = hash;
     }
 
-    public void setData(String data) {
-        this.data = data;
+    public void setTransaction(Transaction transaction)
+    {
+        this.transactions.add(transaction);
+    }
+
+    public Transaction getTransaction(int indx) {
+        return transactions.elementAt(indx);
     }
 
     String calculateHash()
     {
-        String dataHash = index+timestamp+data + previousHash+ nonce;
+        String dataHash = index+timestamp+transactions + previousHash+ nonce;
         byte[] hash=null;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -78,35 +114,69 @@ class Block {
         System.out.println("Block was mined:" +hash);
     }
 }
-
-
-
 class Blockchain {
     Vector<Block> chain;
+    Vector<Transaction> pendingTransactions;
     int difficulty;
-    public Blockchain()
+    int miningReward;
+    public Blockchain(int difficulty,int miningReward)
     {
         chain = new Vector<Block>();
-        difficulty =3;
+        pendingTransactions = new Vector<Transaction>();
+        this.difficulty =difficulty;
+        this.miningReward = miningReward;
         initChain();
-
     }
     private void initChain()
     {
-        chain.add(new Block(0,"20/05/2018","Genesis Block","null"));
+        // Initiating the blockchain with the Genesis Block
+        chain.add(new Block(0,now(),null));
     }
     public Block getLatestBlock()
     {
         return chain.lastElement();
     }
-    public void addBlock(Block block)
+    public void addBlock(String minerAdress)
     {
+        Block block = new Block(getLatestBlock().getIndex()+1,now(),pendingTransactions);
         block.setPreviousHash(getLatestBlock().getHash());
         block.setHash(block.calculateHash());
         block.mineBlock(difficulty);
         chain.add(block);
+        // Delete all mined transaction from the Vector
+        pendingTransactions = new Vector<Transaction>();
+        // Reward the miner
+        pendingTransactions.add(new Transaction("Virtual-Machine",minerAdress,miningReward));
     }
+    public void createTransaction(Transaction transaction)
+    {
+        // Add a transaction to the pending list
+        pendingTransactions.add(transaction);
+    }
+    public int getBalance(String address)
+    {
+        int balance = 0;
+        for(int i=1;i<chain.size();i++)
+        {
+            Vector<Transaction> currentTransactionList = chain.elementAt(i).transactions;
+            for(int j=0;j<currentTransactionList.size();j++)
+            {
+                if(currentTransactionList.elementAt(j).toAddress.equals(address))
+                    balance += currentTransactionList.elementAt(j).amount;
 
+                if(currentTransactionList.elementAt(j).fromAddress.equals(address))
+                    balance += currentTransactionList.elementAt(j).amount;
+            }
+        }
+        return balance;
+    }
+    // returns the current date
+    String now() {
+        final String DATE_FORMAT_NOW = "yyyy-MM-dd HH:mm:ss";
+        Calendar cal = Calendar.getInstance();
+        SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT_NOW);
+        return sdf.format(cal.getTime());
+    }
     @Override
     public String toString() {
         return "Blockchain { \n" +
@@ -133,34 +203,45 @@ class Blockchain {
                 return chain.elementAt(i);
         return null;
     }
+
 }
 
 public  class ChadyCoin
 {
     public static  void main(String args[])
     {
-        Blockchain ChadyCoin = new Blockchain();
-        Vector<Block> blocks;
-        blocks = new Vector<Block>();
-        blocks.add(new Block(1,"21/05/2018","{ reciever : 0x0235, sender : 0x2189, amount: 200$€ }",""));
-        blocks.add(new Block(2,"27/05/2018","{ reciever : 0x02e5, sender : 0x2f89, amount: 12$€ }",""));
-        ChadyCoin.addBlock(blocks.elementAt(0));
-        ChadyCoin.addBlock(blocks.elementAt(1));
-        System.out.println(ChadyCoin);
+        Blockchain ChadyCoin = new Blockchain(2,50);
+        // Create two Transactions and mine them into one Block
+        ChadyCoin.createTransaction(new Transaction("0x2219","0x2ADE5",40));
+        ChadyCoin.createTransaction(new Transaction("0x2219","0x13685",500));
+        ChadyCoin.addBlock("0x868E");
+
+        // Create for Transactions and mine them into one Block
+        ChadyCoin.createTransaction(new Transaction("0x2E19","0x2BBE5",411));
+        ChadyCoin.createTransaction(new Transaction("0x2F19","0x13A8A",703));
+        ChadyCoin.createTransaction(new Transaction("0x2E1B","0x2ACF5",45));
+        ChadyCoin.createTransaction(new Transaction("0x2A1C","0x13E8E",210));
+        ChadyCoin.addBlock("0x2E1B");
+
+        // Check the balance of the first miner: He must get the reward after the second Block got mined
+        System.out.println(ChadyCoin.getBalance("0x868E"));
 
         // printing the validity of the chain before playing around with its blocks
-        System.out.println(ChadyCoin.isValidChain());
+        System.out.println("Validity status : " + ChadyCoin.isValidChain());
 
         // Try to change the hash of a block
         try {
-            ChadyCoin.searchByIndex(1).setData("{ reciever : 0x0235, sender : 0x2189, amount: 70000000000000$€ }");
+            // change the 1st transaction of the 2nd Block
+            ChadyCoin.searchByIndex(1).setTransaction(new Transaction("0x0235E","0x2189F",999000));
         } catch (NullPointerException e)
         {
-            System.out.println("Block not found");
+            System.out.println("Block or Transaction is not found ");
         }
         // changing the hash of one block corrupts the chain
-        System.out.println(ChadyCoin.isValidChain());
+        System.out.println("Validity status : " + ChadyCoin.isValidChain());
 
+        // Show the whole Blockchain
+        System.out.println(ChadyCoin);
 
     }
 }
