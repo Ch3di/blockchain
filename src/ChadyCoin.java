@@ -165,7 +165,7 @@ class Blockchain {
                     balance += currentTransactionList.elementAt(j).amount;
 
                 if(currentTransactionList.elementAt(j).fromAddress.equals(address))
-                    balance += currentTransactionList.elementAt(j).amount;
+                    balance -= currentTransactionList.elementAt(j).amount;
             }
         }
         return balance;
